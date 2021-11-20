@@ -4,8 +4,8 @@ const { injectExportOrderPlugin } = require('./inject-export-order-plugin');
 const { mdxPlugin } = require('./mdx-plugin');
 const { sourceLoaderPlugin } = require('./source-loader-plugin');
 
-module.exports.pluginConfig = function pluginConfig(options, type) {
-    const { framework, svelteOptions } = options;
+module.exports.pluginConfig = async function pluginConfig(options, type) {
+    const { framework, svelteOptions, presets } = options;
     const plugins = [
         codeGeneratorPlugin(options),
         mockCoreJs(),
@@ -60,8 +60,27 @@ module.exports.pluginConfig = function pluginConfig(options, type) {
                 exclude: [/\.stories\.(t|j)sx?$/, /node_modules/],
             })
         );
+
+        const typescriptOptions = await presets.apply('typescript', {});
+        const { reactDocgen, reactDocgenTypescriptOptions } = typescriptOptions;
+        let typescriptPresent;
+
+        try {
+            require.resolve('typescript');
+            typescriptPresent = true;
+        } catch (e){
+            typescriptPresent = false;
+        }
+
+        if (reactDocgen === 'react-docgen-typescript' && typescriptPresent){
+            plugins.push(require('./plugins/react-docgen-typescript')({
+                ...reactDocgenTypescriptOptions,
+                // We *need* this set so that RDT returns default values in the same format as react-docgen
+                savePropValueAsString: true,
+            }))
+        }
     }
-    
+
     if (framework === 'glimmerx') {
         const plugin = require('vite-plugin-glimmerx/index.cjs');
         plugins.push(plugin.default());
